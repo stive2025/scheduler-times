@@ -1,0 +1,79 @@
+# ============================================================
+# SEFIL Attendance System – Docker Compose
+# ============================================================
+# Network note (Windows Docker Desktop):
+#   Containers can reach the host's LAN (e.g. biometric device at
+#   172.20.1.250) through Docker Desktop's default NAT networking.
+#   No special network configuration is required.
+# ============================================================
+
+services:
+  # ── PostgreSQL 16 ──────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sefil_postgres
+    env_file: .env
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Backend API (FastAPI) ──────────────────────────────
+  backend:
+    build: .
+    container_name: sefil_backend
+    env_file: .env
+    environment:
+      - TZ=America/Guayaquil
+    ports:
+      - "8153:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Frontend Web (React + Vite + Nginx) ────────────────
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sefil_frontend
+    ports:
+      - "9125:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ── pgAdmin 4 (optional – activate with: docker compose --profile tools up) ──
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: sefil_pgadmin
+    env_file: .env
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - tools
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.5.0.0/16

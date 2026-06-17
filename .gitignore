@@ -1,0 +1,19 @@
+# ── Secrets ───────────────────────────────────────────────
+.env
+
+# ── Python ───────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# ── Output directories ───────────────────────────────────
+output_sefil/
+output_sefil_justificaciones/
+
+# ── Excel files (keep justificaciones template) ──────────
+*.xlsx
+!justificaciones.xlsx
+
+# ── Docker volumes ───────────────────────────────────────
+pgdata/

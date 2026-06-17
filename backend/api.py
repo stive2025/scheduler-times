@@ -435,7 +435,7 @@ def save_calendar_override(req: CalendarOverrideRequest):
     from backend.calendar_override import save_manual_override
     # Since we can't easily parse row index in the backend without the exact same ordering,
     # we expect the frontend to pass the employee_id and date explicitly.
-    # Actually, the Streamlit app used the row_index and dataframe order.
+    # Actually, the app uses the row_index and dataframe order.
     # For this API, let's just make the frontend pass a list of {"employee_id", "date_str", "status"}
     pass # Wait, let me adjust the request model
 

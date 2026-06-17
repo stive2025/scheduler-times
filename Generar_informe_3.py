@@ -1378,147 +1378,6 @@ def exportar_pdf_con_docx2pdf(word_path: Path) -> Path | None:
         return None
 
 
-# =============================================================================
-# MÓDULO — GENERADOR DE LAUNCHER
-# =============================================================================
-
-def generar_bat(output_dir: Path | None = None):
-    """Crea (o sobreescribe) Lanzar_Dashboard.bat en output_dir.
-
-    El BAT es auto-contenido: incrusta app.py como base64.
-    El destinatario solo necesita Lanzar_Dashboard.bat + Reporte_SEFIL.xlsx.
-    Si output_dir es None usa BASE_DIR.
-    """
-    import base64
-
-    dest = output_dir or BASE_DIR
-    bat_path = dest / "Lanzar_Dashboard.bat"
-
-    # ── Subroutine de restauración de app.py ──────────────────────────────────
-    # Se pone como :subroutine al FINAL del BAT (después del pause >nul) para
-    # evitar el bug de cmd.exe que malinterpreta los ')' de la instrucción
-    # PowerShell cuando está dentro de un bloque IF (...).
-    # Chunks de 3000 chars (muy por debajo del límite de 8191 de cmd.exe).
-    app_path = BASE_DIR / "app.py"
-    restore_sub = ""
-    if app_path.exists():
-        b64 = base64.b64encode(app_path.read_bytes()).decode("ascii")
-        chunks = [b64[i:i+3000] for i in range(0, len(b64), 3000)]
-        lines = ["\r\n:_restore_app_\r\n"]
-        for i, chunk in enumerate(chunks):
-            op = ">" if i == 0 else ">>"
-            lines.append(f"echo {chunk} {op} _app.b64\r\n")
-        lines.append(
-            "powershell -Command "
-            "\"$b=(Get-Content '_app.b64') -join ''; "
-            "[IO.File]::WriteAllBytes('app.py', [Convert]::FromBase64String($b)); "
-            "Remove-Item '_app.b64'\"\r\n"
-            "exit /b\r\n"
-        )
-        restore_sub = "".join(lines)
-
-    contenido = (
-        "@echo off\r\n"
-        "cd /d \"%~dp0\"\r\n"
-        "setlocal EnableDelayedExpansion\r\n"
-        "\r\n"
-        ":: ── Verificar archivo de datos ────────────────────────────────────────────\r\n"
-        "if not exist \"Reporte_SEFIL.xlsx\" (\r\n"
-        "    echo.\r\n"
-        "    echo  [ERROR] No se encontro Reporte_SEFIL.xlsx en esta carpeta.\r\n"
-        "    pause\r\n"
-        "    exit /b 1\r\n"
-        ")\r\n"
-        "\r\n"
-        ":: ── Localizar entorno virtual ──────────────────────────────────────────────\r\n"
-        ":: Busca primero en la carpeta actual, luego en el directorio padre.\r\n"
-        "set _STREAMLIT=\r\n"
-        "if exist \".venv\\Scripts\\streamlit.exe\" set _STREAMLIT=.venv\\Scripts\\streamlit.exe\r\n"
-        "if not defined _STREAMLIT if exist \"..\\.venv\\Scripts\\streamlit.exe\" set _STREAMLIT=..\\.venv\\Scripts\\streamlit.exe\r\n"
-        "\r\n"
-        "if not defined _STREAMLIT (\r\n"
-        "    :: Venv no encontrado: verificar Python e instalar dependencias\r\n"
-        "    where python >nul 2>&1\r\n"
-        "    if errorlevel 1 (\r\n"
-        "        echo.\r\n"
-        "        echo  Python no encontrado. Instalando automaticamente...\r\n"
-        "        echo.\r\n"
-        "        set _PY_OK=0\r\n"
-        "        winget --version >nul 2>&1\r\n"
-        "        if not errorlevel 1 (\r\n"
-        "            echo  Instalando Python con winget...\r\n"
-        "            winget install Python.Python.3.12 --silent --accept-source-agreements --accept-package-agreements\r\n"
-        "            if not errorlevel 1 set _PY_OK=1\r\n"
-        "        )\r\n"
-        "        if \"!_PY_OK!\"==\"0\" (\r\n"
-        "            echo  Descargando Python 3.12 desde python.org...\r\n"
-        "            powershell -Command \"Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe' -OutFile '_py_setup.exe' -UseBasicParsing\"\r\n"
-        "            if not exist \"_py_setup.exe\" (\r\n"
-        "                echo  [ERROR] No se pudo descargar Python.\r\n"
-        "                echo  Instala manualmente: https://www.python.org/downloads/\r\n"
-        "                pause\r\n"
-        "                exit /b 1\r\n"
-        "            )\r\n"
-        "            echo  Instalando Python...\r\n"
-        "            _py_setup.exe /quiet InstallAllUsers=0 PrependPath=1 Include_test=0\r\n"
-        "            del _py_setup.exe\r\n"
-        "        )\r\n"
-        "        for /f \"tokens=2*\" %%a in ('reg query \"HKCU\\Environment\" /v PATH 2^>nul') do set \"PATH=%%b;%PATH%\"\r\n"
-        "        where python >nul 2>&1\r\n"
-        "        if errorlevel 1 (\r\n"
-        "            echo  Python instalado. Cierra y vuelve a abrir este archivo.\r\n"
-        "            pause\r\n"
-        "            exit /b 0\r\n"
-        "        )\r\n"
-        "    )\r\n"
-        "    echo.\r\n"
-        "    echo  Configurando entorno virtual por primera vez...\r\n"
-        "    echo  Esto puede tardar unos minutos, por favor espera.\r\n"
-        "    echo.\r\n"
-        "    python -m venv .venv\r\n"
-        "    if errorlevel 1 (\r\n"
-        "        echo  [ERROR] No se pudo crear el entorno virtual.\r\n"
-        "        pause\r\n"
-        "        exit /b 1\r\n"
-        "    )\r\n"
-        "    echo  Instalando dependencias...\r\n"
-        "    .venv\\Scripts\\pip install streamlit pandas openpyxl plotly --quiet\r\n"
-        "    if errorlevel 1 (\r\n"
-        "        echo  [ERROR] No se pudieron instalar las dependencias.\r\n"
-        "        echo  Verifica tu conexion a internet e intenta de nuevo.\r\n"
-        "        pause\r\n"
-        "        exit /b 1\r\n"
-        "    )\r\n"
-        "    set _STREAMLIT=.venv\\Scripts\\streamlit.exe\r\n"
-        "    echo  Configuracion completada.\r\n"
-        "    echo.\r\n"
-        ")\r\n"
-        "\r\n"
-        ":: ── Restaurar app.py si fue eliminado ─────────────────────────────────────\r\n"
-        "if not exist \"app.py\" call :_restore_app_\r\n"
-        "\r\n"
-        ":: ── Lanzar dashboard ──────────────────────────────────────────────────────\r\n"
-        "echo.\r\n"
-        "echo  Iniciando Dashboard de Asistencias SEFIL...\r\n"
-        "echo  Abriendo navegador en http://localhost:8501\r\n"
-        "echo.\r\n"
-        "echo  Para cerrar el dashboard: cierra esta ventana o presiona Ctrl+C\r\n"
-        "echo  ---------------------------------------------------------------\r\n"
-        "\r\n"
-        "set PYTHONIOENCODING=utf-8\r\n"
-        "start \"\" /B \"%_STREAMLIT%\" run app.py --server.headless true --server.port 8501 --browser.gatherUsageStats false\r\n"
-        "\r\n"
-        "timeout /t 4 /nobreak >nul\r\n"
-        "start \"\" http://localhost:8501\r\n"
-        "\r\n"
-        "echo  Servidor activo. Cierra esta ventana para detenerlo.\r\n"
-        "pause >nul\r\n"
-        "exit /b 0\r\n"
-        + restore_sub
-    )
-    bat_path.write_text(contenido, encoding="utf-8")
-    print(f"  [5/5] Launcher generado: {bat_path}")
-
 
 # =============================================================================
 # PIPELINE PRINCIPAL
@@ -1555,17 +1414,12 @@ def main():
     if pdf_path is None:
         pdf_path = exportar_pdf_reportlab(df_resumen, df_mensual)
 
-    # Launcher del dashboard (se genera dentro de output_sefil/)
-    generar_bat(OUTPUT_DIR)
-
-    # ── Resumen de resultados en consola ──────────────────────────────────
     print("\n" + "═"*65)
     print("   ✅  PIPELINE COMPLETADO EXITOSAMENTE")
     print("═"*65)
     print(f"\n  📊  Excel     → {OUT_EXCEL.name}")
     print(f"  📝  Word      → {OUT_WORD.name}")
     print(f"  📄  PDF       → {OUT_PDF.name}")
-    print(f"  🚀  Dashboard → {OUTPUT_DIR / 'Lanzar_Dashboard.bat'}")
     print(f"\n  Carpeta de salida: {OUTPUT_DIR}/")
     print(f"\n  Registros procesados : {len(df_kpi)}")
     print(f"  Empleados            : {df_kpi['Empleado'].nunique()}")

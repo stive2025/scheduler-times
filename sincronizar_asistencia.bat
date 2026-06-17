@@ -39,7 +39,7 @@ echo.
 echo =====================================================================
 echo [3/3] Sincronizacion completada exitosamente!
 echo Los datos han sido actualizados en la base de datos de Docker.
-echo Abre o actualiza el Dashboard de Streamlit para ver los resultados.
+echo Abre o actualiza el Dashboard para ver los resultados.
 echo =====================================================================
 
 :END

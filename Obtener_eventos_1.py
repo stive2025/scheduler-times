@@ -27,11 +27,11 @@ try:
         start_date_obj = max_date - timedelta(days=7)
         start_time = start_date_obj.strftime("%Y-%m-%dT00:00:00")
     else:
-        # Base de datos vacía, extraer desde inicio de año
-        start_time = f"{datetime.now().year}-01-01T00:00:00"
+        # Base de datos vacía, extraer desde el inicio de los tiempos (o una fecha muy antigua)
+        start_time = "2000-01-01T00:00:00"
 except Exception as e:
     print(f"Advertencia: No se pudo conectar a BD para obtener última fecha ({e}). Usando default.")
-    start_time = f"{datetime.now().year}-01-01T00:00:00"
+    start_time = "2000-01-01T00:00:00"
 end_time = datetime.now().strftime("%Y-%m-%dT23:59:59")
 
 print(f"Consultando desde {start_time} hasta {end_time}...")

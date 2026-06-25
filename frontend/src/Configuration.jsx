@@ -13,6 +13,7 @@ export default function Configuration({ role }) {
   const [jDate, setJDate] = useState('');
   const [jType, setJType] = useState('Atraso');
   const [jReason, setJReason] = useState('');
+  const [jGroup, setJGroup] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -44,14 +45,14 @@ export default function Configuration({ role }) {
     e.preventDefault();
     try {
       await createJustification({
-        employee_id: jEmpId,
-        employee_name: jEmpName,
+        employee_id: jGroup ? 'TODOS' : jEmpId,
+        employee_name: jGroup ? 'TODOS' : jEmpName,
         fecha: jDate,
         tipo: jType,
         reason: jReason
       });
       fetchData();
-      setJEmpId(''); setJEmpName(''); setJDate(''); setJReason('');
+      setJEmpId(''); setJEmpName(''); setJDate(''); setJReason(''); setJGroup(false);
     } catch (err) {
       alert('Error: ' + (err.response?.data?.detail || err.message));
     }
@@ -123,16 +124,27 @@ export default function Configuration({ role }) {
         {/* Justifications Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3>Añadir Justificación</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ margin: 0 }}>Añadir Justificación</h3>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 500, color: 'var(--primary)' }}>
+                <input 
+                  type="checkbox" 
+                  checked={jGroup} 
+                  onChange={e => setJGroup(e.target.checked)} 
+                  style={{ width: '18px', height: '18px' }}
+                />
+                Justificación Grupal (Todos)
+              </label>
+            </div>
             <form onSubmit={handleAddJustification} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ display: 'flex', gap: '12px', opacity: jGroup ? 0.5 : 1 }}>
                 <div style={{ flex: 1 }}>
                   <label className="form-label">Cédula / ID</label>
-                  <input required value={jEmpId} onChange={e => setJEmpId(e.target.value)} />
+                  <input required={!jGroup} disabled={jGroup} value={jGroup ? 'TODOS' : jEmpId} onChange={e => setJEmpId(e.target.value)} />
                 </div>
                 <div style={{ flex: 2 }}>
                   <label className="form-label">Nombre del Empleado (Opcional)</label>
-                  <input value={jEmpName} onChange={e => setJEmpName(e.target.value)} />
+                  <input disabled={jGroup} value={jGroup ? 'TODOS' : jEmpName} onChange={e => setJEmpName(e.target.value)} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>

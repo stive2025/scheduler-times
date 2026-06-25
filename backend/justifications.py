@@ -50,6 +50,40 @@ def add_justification(
 
     session = SessionLocal()
     try:
+        if employee_id == "TODOS":
+            attendances = session.execute(
+                select(AttendanceDaily).where(AttendanceDaily.date == fecha)
+            ).scalars().all()
+            
+            count = 0
+            for attendance in attendances:
+                existing = session.execute(
+                    select(Justification).where(
+                        Justification.employee_id == attendance.employee_id,
+                        Justification.date == fecha,
+                        Justification.type == tipo,
+                    )
+                ).scalar_one_or_none()
+                
+                if existing is None:
+                    justif = Justification(
+                        employee_id=attendance.employee_id,
+                        employee_name=attendance.employee_name,
+                        date=fecha,
+                        type=tipo,
+                        reason=reason,
+                        applied=True,
+                    )
+                    session.add(justif)
+                    _apply_justification(attendance, tipo)
+                    count += 1
+            
+            session.commit()
+            return {
+                "status": "ok",
+                "message": f"Justificación grupal aplicada a {count} empleados.",
+            }
+
         # Check for duplicate
         existing = session.execute(
             select(Justification).where(

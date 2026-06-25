@@ -184,9 +184,14 @@ def inferir_horario(row: pd.Series, fixed_schedules: dict = None, manual_schedul
 
     # ── NUEVA LÓGICA: Bypasear inferencia si hay horario manual diario ──
     emp_name = str(row.get("Nombre", "")).strip()
-    dt = row.get("Fecha")
-    if manual_schedules and (emp_name, dt) in manual_schedules:
-        manual_sched = manual_schedules[(emp_name, dt)]
+    dt_val = row.get("Fecha")
+    dt_key = dt_val.date() if pd.notna(dt_val) else None
+    
+    if "Cecibel" in emp_name and dt_key and dt_key.day == 24:
+        print(f"DEBUG CECIBEL: emp_name={emp_name!r}, dt_key={dt_key!r}, in_manual={((emp_name, dt_key) in manual_schedules if manual_schedules else False)}")
+    
+    if manual_schedules and (emp_name, dt_key) in manual_schedules:
+        manual_sched = manual_schedules[(emp_name, dt_key)]
         if manual_sched == "Medio Tiempo":
             if tiene_tar and not tiene_man:
                 of_ent, of_sal = time(14, 0), time(17, 0)
@@ -373,6 +378,14 @@ def inferir_y_asignar_horarios(df_asist: pd.DataFrame) -> pd.DataFrame:
     )
 
     for idx in df_result[mask_reemplazar].index:
+        emp_name = str(df_result.at[idx, 'Nombre']).strip()
+        dt_val = df_result.at[idx, 'Fecha']
+        dt_key = dt_val.date() if pd.notna(dt_val) else None
+        
+        # Evitar sobreescribir si este día fue asignado manualmente
+        if manual_schedules and (emp_name, dt_key) in manual_schedules:
+            continue
+            
         nombre_horario = df_result.at[idx, 'Horario_Semanal']
         clave = nombre_horario.replace('Horario ', '')
         if clave in HORARIOS_DEFINIDOS:

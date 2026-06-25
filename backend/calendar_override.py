@@ -149,3 +149,63 @@ def get_manual_overrides(year: int, month: int) -> dict:
         return {}
     finally:
         session.close()
+
+
+def save_manual_schedule(employee_name: str, dt: date, schedule: str):
+    """
+    Guarda un horario manual para un día específico (ej. "Horario C") en la tabla
+    manual_schedules. Luego ejecuta el script Generar_informe_3.py y el sync
+    para recalcular los atrasos automáticamente.
+    """
+    session = SessionLocal()
+    try:
+        # Check if override already exists
+        existing = session.scalars(
+            select(ManualSchedule)
+            .where(
+                and_(
+                    ManualSchedule.employee_name == employee_name,
+                    ManualSchedule.date == dt,
+                )
+            )
+        ).first()
+
+        if existing:
+            existing.assigned_status = schedule
+        else:
+            new_override = ManualSchedule(
+                employee_name=employee_name,
+                date=dt,
+                assigned_status=schedule,
+            )
+            session.add(new_override)
+
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
+
+    # Disparar mini-pipeline (Paso 3 y Sync) de forma sincrona o en hilo separado
+    # Lo ejecutamos sincrono porque dura ~5-10 segundos.
+    import subprocess
+    import sys
+    from backend.sync import sync_from_excel
+    import logging
+    
+    logger = logging.getLogger("SEFIL_CalendarOverride")
+    
+    try:
+        logger.info("Ejecutando Generar_informe_3.py para recalcular horarios...")
+        result = subprocess.run([sys.executable, "Generar_informe_3.py"], capture_output=True, text=True, encoding='utf-8')
+        if result.returncode != 0:
+            logger.error(f"Error en Generar_informe_3.py:\n{result.stderr}")
+            return {"error": "Error al recalcular (Generar_informe_3)"}
+            
+        logger.info("Sincronizando de nuevo a BD...")
+        sync_res = sync_from_excel("output_sefil/Reporte_SEFIL.xlsx")
+        return {"status": "ok", "detail": sync_res}
+    except Exception as e:
+        logger.error(f"Error en el mini-pipeline: {e}")
+        return {"error": f"Error al sincronizar: {e}"}

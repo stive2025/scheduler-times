@@ -157,7 +157,7 @@ def _parse_hora(texto: str) -> time | None:
     return None
 
 
-def inferir_horario(row: pd.Series, fixed_schedules: dict = None) -> tuple:
+def inferir_horario(row: pd.Series, fixed_schedules: dict = None, manual_schedules: dict = None) -> tuple:
     """
     Determina el horario oficial para una fila de asistencia según:
       - Día de semana: sábado → Especial
@@ -182,7 +182,31 @@ def inferir_horario(row: pd.Series, fixed_schedules: dict = None) -> tuple:
     tiene_man = em is not None or sm is not None
     tiene_tar = et is not None or st is not None
 
-    # ── NUEVA LÓGICA: Bypasear inferencia si hay horario fijo configurado (Lunes a Viernes) ──
+    # ── NUEVA LÓGICA: Bypasear inferencia si hay horario manual diario ──
+    emp_name = str(row.get("Nombre", "")).strip()
+    dt = row.get("Fecha")
+    if manual_schedules and (emp_name, dt) in manual_schedules:
+        manual_sched = manual_schedules[(emp_name, dt)]
+        if manual_sched == "Medio Tiempo":
+            if tiene_tar and not tiene_man:
+                of_ent, of_sal = time(14, 0), time(17, 0)
+                turno_s = "14:00-17:00 (medio tiempo tarde)"
+                return ("Medio Tiempo", "Media", turno_s,
+                        of_ent, of_sal, None, None, of_ent, of_sal)
+            else:
+                of_ent, of_sal = time(8, 0), time(12, 0)
+                turno_s = "08:00-12:00 (medio tiempo mañana)"
+                return ("Medio Tiempo", "Media", turno_s,
+                        of_ent, of_sal, of_ent, of_sal, None, None)
+        else:
+            clave = manual_sched.replace("Horario ", "").strip()
+            if clave in HORARIOS_DEFINIDOS:
+                h = HORARIOS_DEFINIDOS[clave]
+                return (h["nombre"], h["jornada"], h["turno_str"],
+                        h["entrada"], h["salida"],
+                        h["entrada"], h["salida_man"], h["entrada_tar"], h["salida"])
+
+    # ── Bypasear inferencia si hay horario fijo configurado (Lunes a Viernes) ──
     emp_id = str(row.get("Empleado", "")).strip()
     if weekday >= 0 and weekday < 5 and fixed_schedules and emp_id in fixed_schedules:
         fixed_sched = fixed_schedules[emp_id]
@@ -285,10 +309,11 @@ def inferir_y_asignar_horarios(df_asist: pd.DataFrame) -> pd.DataFrame:
     """
     print("  [2/5] Infiriendo horarios por marcaciones...")
 
-    # Cargar horarios fijos de la base de datos
+    # Cargar horarios fijos y manuales diarios de la base de datos
     fixed_schedules = {}
+    manual_schedules = {}
     try:
-        from backend.database import SessionLocal, EmployeeSchedule
+        from backend.database import SessionLocal, EmployeeSchedule, ManualSchedule
         from sqlalchemy import select
         session = SessionLocal()
         try:
@@ -299,6 +324,13 @@ def inferir_y_asignar_horarios(df_asist: pd.DataFrame) -> pd.DataFrame:
                     fixed_schedules[str(s.employee_id).strip()] = s.schedule_name
             if fixed_schedules:
                 print(f"     → Cargados {len(fixed_schedules)} horarios fijos de empleados desde la BD.")
+                
+            stmt_manual = select(ManualSchedule).where(ManualSchedule.assigned_status.like('Horario%') | (ManualSchedule.assigned_status == 'Medio Tiempo'))
+            db_manuals = session.scalars(stmt_manual).all()
+            for m in db_manuals:
+                manual_schedules[(m.employee_name, m.date)] = m.assigned_status
+            if manual_schedules:
+                print(f"     → Cargados {len(manual_schedules)} horarios manuales diarios desde la BD.")
         finally:
             session.close()
     except Exception as e:
@@ -309,7 +341,7 @@ def inferir_y_asignar_horarios(df_asist: pd.DataFrame) -> pd.DataFrame:
                 "Hora_Entrada_Man", "Hora_Salida_Man",
                 "Hora_Entrada_Tar", "Hora_Salida_Tar"]
 
-    inferidos = df_asist.apply(inferir_horario, axis=1, result_type="expand", fixed_schedules=fixed_schedules)
+    inferidos = df_asist.apply(lambda r: inferir_horario(r, fixed_schedules, manual_schedules), axis=1, result_type="expand")
     inferidos.columns = hor_cols
 
     df_result = pd.concat(

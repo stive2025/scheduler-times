@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
-import { getKpis, getDashboardData, triggerSync, getSystemStatus } from './api';
-import { RefreshCw, Users, Clock, AlertTriangle, XCircle, HelpCircle, CheckCircle } from 'lucide-react';
+import { getKpis, getDashboardData, triggerSync, getSystemStatus, overrideSchedule } from './api';
+import { RefreshCw, Users, Clock, AlertTriangle, XCircle, HelpCircle, CheckCircle, Edit } from 'lucide-react';
 
 const PlotComponent = Plot.default || Plot;
 
@@ -22,6 +22,9 @@ export default function Dashboard({ role, theme }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  
+  // Override Modal
+  const [overrideModal, setOverrideModal] = useState({ open: false, row: null, newSchedule: 'Horario A', loading: false });
 
   // Filters
   const [month, setMonth] = useState('Todos');
@@ -73,6 +76,24 @@ export default function Dashboard({ role, theme }) {
       alert("Error al sincronizar");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleOverrideSchedule = async () => {
+    if (!overrideModal.row) return;
+    setOverrideModal(prev => ({ ...prev, loading: true }));
+    try {
+      await overrideSchedule({
+        employee_name: overrideModal.row.Nombre || overrideModal.row.nom_corto,
+        date_str: overrideModal.row.Fecha.split('T')[0],
+        schedule: overrideModal.newSchedule
+      });
+      alert('Horario actualizado. Los atrasos han sido recalculados.');
+      setOverrideModal({ open: false, row: null, newSchedule: 'Horario A', loading: false });
+      fetchData();
+    } catch (e) {
+      alert('Error al actualizar el horario');
+      setOverrideModal(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -461,6 +482,7 @@ export default function Dashboard({ role, theme }) {
                 <th onClick={() => handleSort('total_atraso')} style={{ cursor: 'pointer' }}>Atr. Total <SortIndicator columnKey="total_atraso" /></th>
                 <th onClick={() => handleSort('horas_trab')} style={{ cursor: 'pointer' }}>Horas Trab. <SortIndicator columnKey="horas_trab" /></th>
                 <th onClick={() => handleSort('estado')} style={{ cursor: 'pointer' }}>Estado <SortIndicator columnKey="estado" /></th>
+                <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -489,6 +511,16 @@ export default function Dashboard({ role, theme }) {
                     }`}>
                       {row.estado}
                     </span>
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <button 
+                      className="btn" 
+                      style={{ padding: '4px 8px', fontSize: '0.85rem' }} 
+                      title="Editar Horario"
+                      onClick={() => setOverrideModal({ open: true, row, newSchedule: row['Horario Detectado'] || 'Horario A', loading: false })}
+                    >
+                      ✏️
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -586,6 +618,47 @@ export default function Dashboard({ role, theme }) {
           </div>
         </div>
       )}
+      {overrideModal.open && (
+        <div className="modal-overlay" onClick={() => !overrideModal.loading && setOverrideModal(prev => ({ ...prev, open: false }))}>
+          <div className="modal-content" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0 }}>Modificar Horario</h3>
+              <button className="btn btn-danger" style={{ padding: '4px 8px' }} onClick={() => !overrideModal.loading && setOverrideModal(prev => ({ ...prev, open: false }))}>✖</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: '8px' }}><strong>Empleado:</strong> {overrideModal.row.nom_corto}</p>
+              <p style={{ marginBottom: '16px' }}><strong>Fecha:</strong> {formatDate(overrideModal.row.Fecha)}</p>
+              
+              <div className="form-group">
+                <label className="form-label">Nuevo Horario:</label>
+                <select 
+                  className="form-control"
+                  value={overrideModal.newSchedule} 
+                  onChange={e => setOverrideModal(prev => ({ ...prev, newSchedule: e.target.value }))}
+                >
+                  <option value="Horario A">Horario A</option>
+                  <option value="Horario B">Horario B</option>
+                  <option value="Horario C">Horario C</option>
+                  <option value="Horario D">Horario D</option>
+                  <option value="Medio Tiempo">Medio Tiempo</option>
+                  <option value="Especial">Especial (Sábados)</option>
+                </select>
+                <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '8px' }}>
+                  Al guardar, se recalculará automáticamente el atraso de este día.
+                </small>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+                <button className="btn" disabled={overrideModal.loading} onClick={() => setOverrideModal(prev => ({ ...prev, open: false }))}>Cancelar</button>
+                <button className="btn btn-primary" disabled={overrideModal.loading} onClick={handleOverrideSchedule}>
+                  {overrideModal.loading ? 'Guardando...' : 'Confirmar Cambio'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -29,3 +29,4 @@ export const toggleUserStatus = (username, is_active) => api.put(`/users/${usern
 export const getSchedules = () => api.get('/schedules').then(r => r.data);
 export const updateSchedule = (data) => api.post('/schedules', data).then(r => r.data);
 export const saveCalendarOverrides = (entries) => api.post('/calendar/overrides', entries).then(r => r.data);
+export const overrideSchedule = (data) => api.post('/calendar/override_schedule', data).then(r => r.data);

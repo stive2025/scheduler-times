@@ -455,3 +455,17 @@ def save_overrides(entries: List[OverrideEntry]):
         if "error" not in res:
             saved += 1
     return {"saved": saved}
+
+class ScheduleOverrideEntry(BaseModel):
+    employee_name: str
+    date_str: str # YYYY-MM-DD
+    schedule: str # "Horario C", "Horario D", etc.
+
+@app.post("/api/calendar/override_schedule")
+def api_override_schedule(req: ScheduleOverrideEntry):
+    from backend.calendar_override import save_manual_schedule
+    dt = datetime.strptime(req.date_str, "%Y-%m-%d").date()
+    res = save_manual_schedule(req.employee_name, dt, req.schedule)
+    if "error" in res:
+        raise HTTPException(status_code=500, detail=res["error"])
+    return res

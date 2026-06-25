@@ -131,17 +131,16 @@ def sync_from_excel(excel_path: Path | str) -> dict:
         }
 
     # ------------------------------------------------------------------
-    # 2. Load existing (employee_id, date) pairs from DB
+    # 2. Load existing records into a dictionary for quick lookup
     # ------------------------------------------------------------------
     session = SessionLocal()
     try:
-        existing_pairs: set[tuple[str, object]] = set(
-            session.execute(
-                select(AttendanceDaily.employee_id, AttendanceDaily.date)
-            ).all()
-        )
+        existing_records = {}
+        for row in session.execute(select(AttendanceDaily)).scalars().all():
+            existing_records[(row.employee_id, row.date)] = row
 
         added = 0
+        updated = 0
         skipped = 0
         date_min = None
         date_max = None
@@ -159,40 +158,57 @@ def sync_from_excel(excel_path: Path | str) -> dict:
             if date_max is None or fecha > date_max:
                 date_max = fecha
 
-            if (emp_id, fecha) in existing_pairs:
-                skipped += 1
-                continue
-
-            # Build the ORM record
-            record = AttendanceDaily(
-                employee_id=emp_id,
-                employee_name=str(row.get("Nombre", "")).strip(),
-                date=fecha,
-                schedule_name=_safe_str(row.get("Horario Detectado")),
-                shift_type=_safe_str(row.get("Jornada")),
-                shift_detail=_safe_str(row.get("Turno")),
-                entry_morning=_parse_time(row.get("Entrada Mañana")),
-                exit_morning=_parse_time(row.get("Salida Mañana")),
-                entry_afternoon=_parse_time(row.get("Entrada Tarde")),
-                exit_afternoon=_parse_time(row.get("Salida Tarde")),
-                hours_morning=_parse_numeric(row.get("Horas Mañana")),
-                hours_afternoon=_parse_numeric(row.get("Horas Tarde")),
-                hours_total=_parse_numeric(row.get("Horas Total")),
-                delay_morning_min=_parse_numeric(row.get("Atraso Man(min)")),
-                delay_afternoon_min=_parse_numeric(row.get("Atraso Tar(min)")),
-                delay_total_min=_parse_numeric(row.get("Atraso Total(min)")),
-                early_exit_min=_parse_numeric(row.get("Salida Ant(min)")),
-                overtime_hours=_parse_numeric(row.get("Horas Extra")),
-                event=_safe_str(row.get("Evento")),
-                month_period=fecha.strftime("%Y-%m"),
-            )
-
-            # Build shift_str from schedule_name if not directly available
-            record.shift_str = _safe_str(row.get("Horario Detectado"))
-
-            session.add(record)
-            existing_pairs.add((emp_id, fecha))
-            added += 1
+            if (emp_id, fecha) in existing_records:
+                # Update existing record
+                record = existing_records[(emp_id, fecha)]
+                record.employee_name = str(row.get("Nombre", "")).strip()
+                record.schedule_name = _safe_str(row.get("Horario Detectado"))
+                record.shift_type = _safe_str(row.get("Jornada"))
+                record.shift_detail = _safe_str(row.get("Turno"))
+                record.entry_morning = _parse_time(row.get("Entrada Mañana"))
+                record.exit_morning = _parse_time(row.get("Salida Mañana"))
+                record.entry_afternoon = _parse_time(row.get("Entrada Tarde"))
+                record.exit_afternoon = _parse_time(row.get("Salida Tarde"))
+                record.hours_morning = _parse_numeric(row.get("Horas Mañana"))
+                record.hours_afternoon = _parse_numeric(row.get("Horas Tarde"))
+                record.hours_total = _parse_numeric(row.get("Horas Total"))
+                record.delay_morning_min = _parse_numeric(row.get("Atraso Man(min)"))
+                record.delay_afternoon_min = _parse_numeric(row.get("Atraso Tar(min)"))
+                record.delay_total_min = _parse_numeric(row.get("Atraso Total(min)"))
+                record.early_exit_min = _parse_numeric(row.get("Salida Ant(min)"))
+                record.overtime_hours = _parse_numeric(row.get("Horas Extra"))
+                record.event = _safe_str(row.get("Evento"))
+                record.month_period = fecha.strftime("%Y-%m")
+                record.shift_str = _safe_str(row.get("Horario Detectado"))
+                updated += 1
+            else:
+                # Build the ORM record
+                record = AttendanceDaily(
+                    employee_id=emp_id,
+                    employee_name=str(row.get("Nombre", "")).strip(),
+                    date=fecha,
+                    schedule_name=_safe_str(row.get("Horario Detectado")),
+                    shift_type=_safe_str(row.get("Jornada")),
+                    shift_detail=_safe_str(row.get("Turno")),
+                    entry_morning=_parse_time(row.get("Entrada Mañana")),
+                    exit_morning=_parse_time(row.get("Salida Mañana")),
+                    entry_afternoon=_parse_time(row.get("Entrada Tarde")),
+                    exit_afternoon=_parse_time(row.get("Salida Tarde")),
+                    hours_morning=_parse_numeric(row.get("Horas Mañana")),
+                    hours_afternoon=_parse_numeric(row.get("Horas Tarde")),
+                    hours_total=_parse_numeric(row.get("Horas Total")),
+                    delay_morning_min=_parse_numeric(row.get("Atraso Man(min)")),
+                    delay_afternoon_min=_parse_numeric(row.get("Atraso Tar(min)")),
+                    delay_total_min=_parse_numeric(row.get("Atraso Total(min)")),
+                    early_exit_min=_parse_numeric(row.get("Salida Ant(min)")),
+                    overtime_hours=_parse_numeric(row.get("Horas Extra")),
+                    event=_safe_str(row.get("Evento")),
+                    month_period=fecha.strftime("%Y-%m"),
+                )
+                record.shift_str = _safe_str(row.get("Horario Detectado"))
+                session.add(record)
+                existing_records[(emp_id, fecha)] = record
+                added += 1
 
         # ------------------------------------------------------------------
         # 4. Flush attendance records & log the sync
@@ -201,7 +217,7 @@ def sync_from_excel(excel_path: Path | str) -> dict:
 
         log_entry = SyncLog(
             records_added=added,
-            records_skipped=skipped,
+            records_skipped=updated,
             date_range_start=date_min,
             date_range_end=date_max,
             source_file=str(excel_path),
@@ -212,6 +228,7 @@ def sync_from_excel(excel_path: Path | str) -> dict:
 
         return {
             "added": added,
+            "updated": updated,
             "skipped": skipped,
             "date_start": str(date_min) if date_min else None,
             "date_end": str(date_max) if date_max else None,

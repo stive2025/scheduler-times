@@ -197,15 +197,13 @@ def save_manual_schedule(employee_name: str, dt: date, schedule: str):
     logger = logging.getLogger("SEFIL_CalendarOverride")
     
     try:
-        logger.info("Ejecutando Generar_informe_3.py para recalcular horarios...")
-        result = subprocess.run([sys.executable, "Generar_informe_3.py"], capture_output=True, text=True, encoding='utf-8')
+        logger.info("Ejecutando main_pipeline.py para recalcular horarios de manera completa...")
+        result = subprocess.run([sys.executable, "main_pipeline.py"], capture_output=True, text=True, encoding='utf-8')
         if result.returncode != 0:
-            logger.error(f"Error en Generar_informe_3.py:\n{result.stderr}")
-            return {"error": "Error al recalcular (Generar_informe_3)"}
+            logger.error(f"Error en main_pipeline.py:\n{result.stderr}")
+            return {"error": "Error al recalcular (main_pipeline)"}
             
-        logger.info("Sincronizando de nuevo a BD...")
-        sync_res = sync_from_excel("output_sefil/Reporte_SEFIL.xlsx")
-        return {"status": "ok", "detail": sync_res}
+        return {"status": "ok", "detail": "Pipeline completado."}
     except Exception as e:
         logger.error(f"Error en el mini-pipeline: {e}")
         return {"error": f"Error al sincronizar: {e}"}

@@ -25,6 +25,12 @@ export default function Dashboard({ role, theme }) {
   
   // Override Modal
   const [overrideModal, setOverrideModal] = useState({ open: false, row: null, newSchedule: 'Horario A', loading: false });
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4000);
+  };
 
   // Filters
   const [month, setMonth] = useState('Todos');
@@ -88,11 +94,12 @@ export default function Dashboard({ role, theme }) {
         date_str: overrideModal.row.Fecha.split('T')[0],
         schedule: overrideModal.newSchedule
       });
-      alert('Horario actualizado. Los atrasos han sido recalculados.');
+      showToast('Horario actualizado. Los atrasos han sido recalculados.', 'success');
       setOverrideModal({ open: false, row: null, newSchedule: 'Horario A', loading: false });
       fetchData();
-    } catch (e) {
-      alert('Error al actualizar el horario');
+    } catch (err) {
+      console.error(err);
+      showToast('Error al actualizar el horario.', 'error');
       setOverrideModal(prev => ({ ...prev, loading: false }));
     }
   };
@@ -482,7 +489,6 @@ export default function Dashboard({ role, theme }) {
                 <th onClick={() => handleSort('total_atraso')} style={{ cursor: 'pointer' }}>Atr. Total <SortIndicator columnKey="total_atraso" /></th>
                 <th onClick={() => handleSort('horas_trab')} style={{ cursor: 'pointer' }}>Horas Trab. <SortIndicator columnKey="horas_trab" /></th>
                 <th onClick={() => handleSort('estado')} style={{ cursor: 'pointer' }}>Estado <SortIndicator columnKey="estado" /></th>
-                <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -490,7 +496,13 @@ export default function Dashboard({ role, theme }) {
                 <tr key={i}>
                   <td>{row.nom_corto}</td>
                   <td>{formatDate(row.Fecha)}</td>
-                  <td>{row['Horario Detectado']}</td>
+                  <td 
+                    onClick={() => setOverrideModal({ open: true, row, newSchedule: row['Horario Detectado'] || 'Horario A', loading: false })}
+                    style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }}
+                    title="Haz clic para modificar el horario manualmente"
+                  >
+                    {row['Horario Detectado']}
+                  </td>
                   <td>{row.Jornada}</td>
                   <td>{row['Entrada Mañana'] || '-'}</td>
                   <td>{row['Salida Mañana'] || '-'}</td>
@@ -511,16 +523,6 @@ export default function Dashboard({ role, theme }) {
                     }`}>
                       {row.estado}
                     </span>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <button 
-                      className="btn" 
-                      style={{ padding: '4px 8px', fontSize: '0.85rem' }} 
-                      title="Editar Horario"
-                      onClick={() => setOverrideModal({ open: true, row, newSchedule: row['Horario Detectado'] || 'Horario A', loading: false })}
-                    >
-                      ✏️
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -582,7 +584,13 @@ export default function Dashboard({ role, theme }) {
                       <tr key={i}>
                         <td>{row.nom_corto}</td>
                         <td>{formatDate(row.Fecha)}</td>
-                        <td>{row['Horario Detectado']}</td>
+                        <td 
+                          onClick={() => setOverrideModal({ open: true, row, newSchedule: row['Horario Detectado'] || 'Horario A', loading: false })}
+                          style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }}
+                          title="Haz clic para modificar el horario manualmente"
+                        >
+                          {row['Horario Detectado']}
+                        </td>
                         <td>{row.Jornada}</td>
                         <td>{row['Entrada Mañana'] || '-'}</td>
                         <td>{row['Salida Mañana'] || '-'}</td>
@@ -659,6 +667,17 @@ export default function Dashboard({ role, theme }) {
         </div>
       )}
 
+      {toast.show && (
+        <div style={{
+          position: 'fixed', bottom: '24px', right: '24px', 
+          backgroundColor: toast.type === 'error' ? '#ef4444' : '#3fb950', 
+          color: 'white', padding: '12px 24px', borderRadius: '8px', 
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 1000,
+          animation: 'fade-in 0.3s ease-out'
+        }}>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

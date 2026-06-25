@@ -403,8 +403,10 @@ def get_calendar_matrix(year: int, month: int):
         
     # Manual overrides
     overrides = get_manual_overrides(year, month)
+    valid_cal_statuses = {"Asistencia", "Falta", "Permiso", "No Laborable"}
     for (emp_id, dt), status in overrides.items():
-        lookup[(emp_id, dt)] = status
+        if status in valid_cal_statuses:
+            lookup[(emp_id, dt)] = status
         
     # Pivot
     rows_data = []

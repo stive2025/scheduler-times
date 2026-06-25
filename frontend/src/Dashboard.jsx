@@ -498,10 +498,12 @@ export default function Dashboard({ role, theme }) {
                   <td>{formatDate(row.Fecha)}</td>
                   <td 
                     onClick={() => setOverrideModal({ open: true, row, newSchedule: row['Horario Detectado'] || 'Horario A', loading: false })}
-                    style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }}
+                    style={{ cursor: 'pointer', textAlign: 'center' }}
                     title="Haz clic para modificar el horario manualmente"
                   >
-                    {row['Horario Detectado']}
+                    <span className="badge badge-neutral" style={{ border: '1px dashed var(--primary)', color: 'var(--primary)', background: 'transparent' }}>
+                      {row['Horario Detectado']}
+                    </span>
                   </td>
                   <td>{row.Jornada}</td>
                   <td>{row['Entrada Mañana'] || '-'}</td>
@@ -586,10 +588,12 @@ export default function Dashboard({ role, theme }) {
                         <td>{formatDate(row.Fecha)}</td>
                         <td 
                           onClick={() => setOverrideModal({ open: true, row, newSchedule: row['Horario Detectado'] || 'Horario A', loading: false })}
-                          style={{ cursor: 'pointer', color: 'var(--primary)', textDecoration: 'underline' }}
+                          style={{ cursor: 'pointer', textAlign: 'center' }}
                           title="Haz clic para modificar el horario manualmente"
                         >
-                          {row['Horario Detectado']}
+                          <span className="badge badge-neutral" style={{ border: '1px dashed var(--primary)', color: 'var(--primary)', background: 'transparent' }}>
+                            {row['Horario Detectado']}
+                          </span>
                         </td>
                         <td>{row.Jornada}</td>
                         <td>{row['Entrada Mañana'] || '-'}</td>

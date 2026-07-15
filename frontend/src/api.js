@@ -19,6 +19,9 @@ export const getCalendarMatrix = (year, month) => api.get(`/calendar?year=${year
 export const getSystemStatus = () => api.get('/system/status').then(r => r.data);
 export const triggerSync = () => api.post('/system/sync').then(r => r.data);
 
+// Export endpoints
+export const exportAttendance = () => api.get('/export/attendance', { responseType: 'blob' }).then(r => r.data);
+
 // Configurations
 export const getJustifications = (month) => api.get(`/justifications${month ? `?month=${month}` : ''}`).then(r => r.data);
 export const createJustification = (data) => api.post('/justifications', data).then(r => r.data);

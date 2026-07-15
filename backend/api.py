@@ -1,6 +1,7 @@
 import math
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import pandas as pd
@@ -8,6 +9,7 @@ from datetime import datetime
 import subprocess
 import sys
 import os
+import io
 
 import threading
 import schedule
@@ -19,6 +21,7 @@ from backend.auth import authenticate_user, change_password, init_default_users
 from backend.sync import get_last_sync, get_total_records
 from backend.justifications import add_justification, remove_justification, list_justifications
 from backend.schedules import get_all_employee_schedules, upsert_employee_schedule
+from backend.export import build_attendance_export
 
 def run_pipeline_job():
     print("Iniciando sincronización automática programada a las 22:00...", flush=True)
@@ -263,6 +266,16 @@ def get_dashboard_data():
         "employees": employees,
         "jornadas": jornadas
     }
+
+@app.get("/api/export/attendance")
+def export_attendance():
+    content = build_attendance_export()
+    filename = f"Asistencias_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 @app.get("/api/dashboard/kpis")
 def get_kpis():

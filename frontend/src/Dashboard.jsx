@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Plot from 'react-plotly.js';
-import { getKpis, getDashboardData, triggerSync, getSystemStatus, overrideSchedule } from './api';
-import { RefreshCw, Users, Clock, AlertTriangle, XCircle, HelpCircle, CheckCircle, Edit } from 'lucide-react';
+import { getKpis, getDashboardData, triggerSync, getSystemStatus, overrideSchedule, exportAttendance } from './api';
+import { RefreshCw, Users, Clock, AlertTriangle, XCircle, HelpCircle, CheckCircle, Edit, Download } from 'lucide-react';
 
 const PlotComponent = Plot.default || Plot;
 
@@ -22,6 +22,7 @@ export default function Dashboard({ role, theme }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   
   // Override Modal
   const [overrideModal, setOverrideModal] = useState({ open: false, row: null, newSchedule: 'Horario A', loading: false });
@@ -82,6 +83,26 @@ export default function Dashboard({ role, theme }) {
       alert("Error al sincronizar");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const blob = await exportAttendance();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+      a.href = url;
+      a.download = `Asistencias_${stamp}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("Error al generar el Excel de asistencias");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -314,12 +335,18 @@ export default function Dashboard({ role, theme }) {
           <h1>Resumen y KPIs</h1>
           <p className="subtitle" style={{ margin: 0 }}>Estadísticas mensuales de asistencia</p>
         </div>
-        {role !== 'rrhh' && (
-          <button className="btn btn-primary" onClick={handleSync} disabled={syncing}>
-            <RefreshCw size={16} className={syncing ? "spin" : ""} /> 
-            {syncing ? 'Sincronizando...' : 'Forzar Sincronización DB'}
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn btn-primary" onClick={handleExport} disabled={exporting}>
+            <Download size={16} />
+            {exporting ? 'Generando...' : 'Descargar Excel'}
           </button>
-        )}
+          {role !== 'rrhh' && (
+            <button className="btn btn-primary" onClick={handleSync} disabled={syncing}>
+              <RefreshCw size={16} className={syncing ? "spin" : ""} />
+              {syncing ? 'Sincronizando...' : 'Forzar Sincronización DB'}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="kpi-grid">
